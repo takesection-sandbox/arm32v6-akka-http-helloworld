@@ -10,6 +10,7 @@ import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.{Flow, Sink, Source}
 
 import scala.concurrent.{ExecutionContext, Future}
+import scala.util.{Failure, Success}
 
 class Server {
 
@@ -23,7 +24,7 @@ class Server {
   val route =
     path(Segment) { message ⇒
       get {
-        complete {
+        onComplete {
           val source: Source[String, NotUsed] = Source.single(message)
           val helloWorld: Flow[String, ToResponseMarshallable, NotUsed] = Flow[String].map {
             case "error" ⇒
@@ -33,10 +34,15 @@ class Server {
             case "NPE" ⇒
               throw new NullPointerException()
             case s ⇒
-              HttpEntity(ContentTypes.`text/html(UTF-8)`, s"<h1>${s}</h1>")
+              HttpEntity(ContentTypes.`text/html(UTF-8)`, s"<h1>$s</h1>")
           }
           val sink: Sink[ToResponseMarshallable, Future[ToResponseMarshallable]] = Sink.head[ToResponseMarshallable]
-          for (f <- source.via(helloWorld).runWith(sink)) yield f
+          source.via(helloWorld).runWith(sink)
+        } {
+          case Success(value) ⇒
+            complete(value)
+          case Failure(cause) ⇒
+            throw cause
         }
       }
     }
