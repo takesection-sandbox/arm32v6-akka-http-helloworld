@@ -1,10 +1,14 @@
 package jp.pigumer.http
 
+import akka.NotUsed
 import akka.actor.ActorSystem
 import akka.stream.ActorMaterializer
 import akka.http.scaladsl.Http
+import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.server.Directives._
+import akka.http.scaladsl.server.{RequestContext, StandardRoute}
+import akka.stream.scaladsl.{Flow, Sink, Source}
 
 import scala.concurrent.Future
 
@@ -18,9 +22,16 @@ class Server {
   implicit val executionContext = system.dispatcher
 
   val route =
-    pathEndOrSingleSlash {
+    path(Segment) { message ⇒
       get {
-        complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, "<h1>Say hello to akka-http</h1>"))
+        complete {
+          val source: Source[String, NotUsed] = Source.single(message)
+          val helloWorld: Flow[String, ToResponseMarshallable, NotUsed] = Flow[String].map { _ ⇒
+            HttpEntity(ContentTypes.`text/html(UTF-8)`, s"<h1>${message}</h1>")
+          }
+          val sink: Sink[ToResponseMarshallable, Future[ToResponseMarshallable]] = Sink.head[ToResponseMarshallable]
+          for (f <- source.via(helloWorld).runWith(sink)) yield f
+        }
       }
     }
 
