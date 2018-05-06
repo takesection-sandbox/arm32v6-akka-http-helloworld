@@ -6,10 +6,10 @@ import scala.concurrent.Future
 
 class EchoActor extends Actor {
   private val logger = Logging(context.system, this)
-  import scala.concurrent.ExecutionContext.Implicits.global
   override def receive: Receive = {
     case s ⇒
       val originalSender = sender
+      implicit val ec = context.dispatcher
       logger.info(s"$originalSender $s")
       Future {
         s

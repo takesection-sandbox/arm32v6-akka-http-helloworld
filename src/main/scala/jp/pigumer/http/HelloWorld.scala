@@ -27,6 +27,7 @@ class Server extends HelloWorldService {
   private val monitor = system.actorOf(Props[DeadLetterMonitor])
   override val echo: ActorRef = system.actorOf(Props[EchoActor], "echo")
   override val dead: ActorRef = system.actorOf(Props[DeadActor], "dead")
+  system.stop(dead)
 
   system.eventStream.subscribe(monitor, classOf[DeadLetter])
 
