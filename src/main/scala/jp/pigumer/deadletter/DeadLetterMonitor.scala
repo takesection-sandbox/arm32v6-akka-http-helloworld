@@ -14,11 +14,12 @@ class DeadLetterMonitor extends Actor {
 
   private val src: Source[DeadLetter, SourceQueueWithComplete[DeadLetter]] =
     Source.queue[DeadLetter](100, OverflowStrategy.backpressure)
-  private val sink: Sink[DeadLetter, Future[Done]] = Sink.foreach {
-    case DeadLetter(message, sender, recipient) ⇒
-      logger.info(s"$src $recipient $message")
-  }
-  private val (queue, _) = src.toMat(sink)(Keep.both).run()
+  private val sink: Sink[Any, Future[Done]] = Sink.ignore
+  private val (queue, _) = src
+    .map {
+      case DeadLetter(message, sender, recipient) ⇒
+        logger.info(s"$message - $recipient")
+    }.toMat(sink)(Keep.both).run()
 
   override def receive: Receive = {
     case deadLetter: DeadLetter ⇒
