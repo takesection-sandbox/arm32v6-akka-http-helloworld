@@ -1,43 +1,31 @@
 package jp.pigumer.http
 
-import akka.NotUsed
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
-import akka.http.scaladsl.marshalling.ToResponseMarshallable
-import akka.http.scaladsl.model._
 import akka.http.scaladsl.server.Directives._
+import akka.http.scaladsl.server.Route
 import akka.stream.ActorMaterializer
-import akka.stream.scaladsl.{Flow, Sink, Source}
+import akka.stream.scaladsl.Source
+import akka.util.Timeout
 
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.duration._
+import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import scala.util.{Failure, Success}
 
-class Server {
+class Server extends HelloWorldService {
 
   def createSystem: ActorSystem = ActorSystem("helloworld")
 
-  implicit val system = createSystem
+  implicit val system: ActorSystem = createSystem
 
-  implicit val materializer = ActorMaterializer()
-  implicit val executionContext = system.dispatcher
+  override implicit val materializer: ActorMaterializer = ActorMaterializer()
+  override implicit val executionContext: ExecutionContextExecutor = system.dispatcher
 
-  val route =
+  val route: Route =
     path(Segment) { message ⇒
       get {
         onComplete {
-          val source: Source[String, NotUsed] = Source.single(message)
-          val helloWorld: Flow[String, ToResponseMarshallable, NotUsed] = Flow[String].map {
-            case "error" ⇒
-              HttpResponse(StatusCodes.InternalServerError)
-            case "notfound" ⇒
-              HttpResponse(StatusCodes.NotFound)
-            case "NPE" ⇒
-              throw new NullPointerException()
-            case s ⇒
-              HttpEntity(ContentTypes.`text/html(UTF-8)`, s"<h1>$s</h1>")
-          }
-          val sink: Sink[ToResponseMarshallable, Future[ToResponseMarshallable]] = Sink.head[ToResponseMarshallable]
-          source.via(helloWorld).runWith(sink)
+          helloWorldGraph(Source.single(message)).run()
         } {
           case Success(value) ⇒
             complete(value)
