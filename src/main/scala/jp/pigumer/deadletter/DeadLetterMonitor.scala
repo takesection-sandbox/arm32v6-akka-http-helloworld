@@ -1,12 +1,12 @@
 package jp.pigumer.deadletter
 
-import akka.actor.Actor
+import akka.actor.{Actor, DeadLetter}
 import akka.event.Logging
 
 class DeadLetterMonitor extends Actor {
   private val logger = Logging(context.system, this)
   override def receive: Receive = {
-    case msg ⇒
-      logger.info(s"deadletter $msg")
+    case DeadLetter(msg, sender, recipient) ⇒
+      logger.info(s"deadletter $recipient $msg")
   }
 }

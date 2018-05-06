@@ -12,7 +12,6 @@ import jp.pigumer.deadletter.DeadLetterMonitor
 
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
-import scala.util.{Failure, Success}
 
 class Server extends HelloWorldService {
 
@@ -36,14 +35,8 @@ class Server extends HelloWorldService {
   val route: Route =
     path(Segment) { message ⇒
       get {
-        onComplete {
-          helloWorldGraph(Source.single(message)).run()
-        } {
-          case Success(value) ⇒
-            complete(value)
-          case Failure(cause) ⇒
-            logger.error(cause, "HelloWorld")
-            throw cause
+        onSuccess(helloWorldGraph(Source.single(message)).run()) { value ⇒
+          complete(value)
         }
       }
     }
@@ -61,6 +54,6 @@ object HelloWorld extends App {
     implicit val executionContext: ExecutionContext = server.executionContext
     bindingFuture
       .flatMap(_.unbind()) // trigger unbinding from the port
-      .onComplete(_ => system.terminate()) // and shutdown when done
+      .onComplete(_ ⇒ system.terminate()) // and shutdown when done
   }
 }
