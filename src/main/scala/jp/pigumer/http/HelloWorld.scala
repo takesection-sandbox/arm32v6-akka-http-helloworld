@@ -13,7 +13,7 @@ import jp.pigumer.deadletter.DeadLetterMonitor
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 
-class Server extends HelloWorldService {
+class Server extends HelloWorldService with DeadLetterMonitor {
 
   def createSystem: ActorSystem = ActorSystem("helloworld")
   implicit val system: ActorSystem = createSystem
@@ -21,14 +21,13 @@ class Server extends HelloWorldService {
   override implicit val materializer: ActorMaterializer = ActorMaterializer()
   override implicit val executionContext: ExecutionContextExecutor = system.dispatcher
 
-  private val logger = Logging(system, "HelloWorld")
+  protected val logger = Logging(system, "HelloWorld")
 
-  private val monitor = system.actorOf(Props[DeadLetterMonitor])
   override val echo: ActorRef = system.actorOf(Props[EchoActor], "echo")
   override val dead: ActorRef = system.actorOf(Props[DeadActor], "dead")
   system.stop(dead)
 
-  system.eventStream.subscribe(monitor, classOf[DeadLetter])
+  system.eventStream.subscribe(deadLetterMonitor, classOf[DeadLetter])
 
   private implicit val timeout: Timeout = 30 seconds
 

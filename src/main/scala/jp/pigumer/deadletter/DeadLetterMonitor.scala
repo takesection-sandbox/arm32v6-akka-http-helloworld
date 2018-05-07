@@ -1,28 +1,25 @@
 package jp.pigumer.deadletter
 
-import akka.Done
-import akka.actor.{Actor, DeadLetter}
-import akka.event.Logging
+import akka.actor.{ActorRef, DeadLetter}
+import akka.event.LoggingAdapter
 import akka.stream._
-import akka.stream.scaladsl.{Keep, Sink, Source, SourceQueueWithComplete}
+import akka.stream.scaladsl.{Sink, Source, SourceQueueWithComplete}
 
-import scala.concurrent.Future
+trait DeadLetterMonitor {
+  protected val logger: LoggingAdapter
+  implicit val materializer: ActorMaterializer
 
-class DeadLetterMonitor extends Actor {
-  private val logger = Logging(context.system, this)
-  private implicit val materializer = ActorMaterializer()(context)
+  lazy val deadLetterMonitor: ActorRef =
+    Source.actorRef[DeadLetter](100, OverflowStrategy.dropTail)
+      .to(Sink.foreach {
+        case DeadLetter(message, sender, recipient) ⇒
+          logger.info(s"$message - $recipient")
+      }).run()
 
-  private val src: Source[DeadLetter, SourceQueueWithComplete[DeadLetter]] =
+  lazy val deadLetterQueue: SourceQueueWithComplete[DeadLetter] =
     Source.queue[DeadLetter](100, OverflowStrategy.backpressure)
-  private val sink: Sink[Any, Future[Done]] = Sink.ignore
-  private val (queue, _) = src
-    .map {
-      case DeadLetter(message, sender, recipient) ⇒
-        logger.info(s"$message - $recipient")
-    }.toMat(sink)(Keep.both).run()
-
-  override def receive: Receive = {
-    case deadLetter: DeadLetter ⇒
-      queue.offer(deadLetter)
-  }
+      .to(Sink.foreach {
+        case DeadLetter(message, sender, recipient) ⇒
+          logger.info(s"$message - $recipient")
+      }).run()
 }
